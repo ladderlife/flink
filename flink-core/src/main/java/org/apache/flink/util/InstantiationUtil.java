@@ -502,7 +502,7 @@ public final class InstantiationUtil {
 		}
 	}
 
-	public static <T> T readObjectFromConfig(Configuration config, String key, ClassLoader cl) throws IOException, ClassNotFoundException {
+	public static synchronized <T> T readObjectFromConfig(Configuration config, String key, ClassLoader cl) throws IOException, ClassNotFoundException {
 		byte[] bytes = config.getBytes(key, null);
 		if (bytes == null) {
 			return null;

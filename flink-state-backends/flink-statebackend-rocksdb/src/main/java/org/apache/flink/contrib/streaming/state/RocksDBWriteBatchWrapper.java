@@ -37,9 +37,11 @@ import javax.annotation.Nullable;
  */
 public class RocksDBWriteBatchWrapper implements AutoCloseable {
 
-	private static final int MIN_CAPACITY = 100;
-	private static final int MAX_CAPACITY = 1000;
-	private static final int PER_RECORD_BYTES = 100;
+	private static final int MIN_CAPACITY = 10 * 1024;
+	private static final int MAX_CAPACITY = 50 * 1024 * 1024;
+	private static final int DEFAULT_CAPACITY = 5 * 1024 * 1024;
+	private static final int INITIAL_SIZE = 50 * 1024;
+	private static final int MAX_RECORDS = 1000;
 
 	private final RocksDB db;
 
@@ -50,11 +52,11 @@ public class RocksDBWriteBatchWrapper implements AutoCloseable {
 	private final int capacity;
 
 	public RocksDBWriteBatchWrapper(@Nonnull RocksDB rocksDB) {
-		this(rocksDB, null, 500);
+		this(rocksDB, null, DEFAULT_CAPACITY);
 	}
 
 	public RocksDBWriteBatchWrapper(@Nonnull RocksDB rocksDB, @Nullable WriteOptions options) {
-		this(rocksDB, options, 500);
+		this(rocksDB, options, DEFAULT_CAPACITY);
 	}
 
 	public RocksDBWriteBatchWrapper(@Nonnull RocksDB rocksDB, @Nullable WriteOptions options, int capacity) {
@@ -64,7 +66,7 @@ public class RocksDBWriteBatchWrapper implements AutoCloseable {
 		this.db = rocksDB;
 		this.options = options;
 		this.capacity = capacity;
-		this.batch = new WriteBatch(this.capacity * PER_RECORD_BYTES);
+		this.batch = new WriteBatch(INITIAL_SIZE);
 	}
 
 	public void put(
@@ -74,18 +76,20 @@ public class RocksDBWriteBatchWrapper implements AutoCloseable {
 
 		batch.put(handle, key, value);
 
-		if (batch.count() == capacity) {
-			flush();
-		}
+		maybeFlush();
 	}
 
 	public void remove(
 		@Nonnull ColumnFamilyHandle handle,
 		@Nonnull byte[] key) throws RocksDBException {
 
-		batch.remove(handle, key);
+		batch.delete(handle, key);
 
-		if (batch.count() == capacity) {
+		maybeFlush();
+	}
+
+	private void maybeFlush() throws RocksDBException {
+		if (batch.getDataSize() >= capacity || batch.count() >= MAX_RECORDS) {
 			flush();
 		}
 	}

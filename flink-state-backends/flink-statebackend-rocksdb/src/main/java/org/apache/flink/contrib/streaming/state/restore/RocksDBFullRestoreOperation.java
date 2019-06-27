@@ -45,7 +45,9 @@ import org.apache.flink.util.StateMigrationException;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.FlushOptions;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.WriteOptions;
 
 import javax.annotation.Nonnull;
 
@@ -141,6 +143,9 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 				restoreKeyGroupsInStateHandle();
 			}
 		}
+		this.db.compactRange();
+		FlushOptions opts = new FlushOptions().setWaitForFlush(true);
+		this.db.flush(opts);
 		return new RocksDBRestoreResult(this.db, defaultColumnFamilyHandle, nativeMetricMonitor,
 			-1, null, null);
 	}
@@ -188,7 +193,7 @@ public class RocksDBFullRestoreOperation<K> extends AbstractRocksDBRestoreOperat
 	 */
 	private void restoreKVStateData() throws IOException, RocksDBException {
 		//for all key-groups in the current state handle...
-		try (RocksDBWriteBatchWrapper writeBatchWrapper = new RocksDBWriteBatchWrapper(db)) {
+		try (RocksDBWriteBatchWrapper writeBatchWrapper = new RocksDBWriteBatchWrapper(db, new WriteOptions().setDisableWAL(true))) {
 			for (Tuple2<Integer, Long> keyGroupOffset : currentKeyGroupsStateHandle.getGroupRangeOffsets()) {
 				int keyGroup = keyGroupOffset.f0;
 
